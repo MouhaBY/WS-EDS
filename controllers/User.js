@@ -29,10 +29,30 @@ exports.login = async (req, res, next) => {
             const profiles = result_profiles.recordset;
             let profilesTab = []
             for (let i=0; i < profiles.length; i++){
-                profilesTab.push(' ' + profiles[i].SystemName) 
+                profilesTab.push(profiles[i].SystemName) 
             }
 
-            // Return all informations for user
+            // Check Profiles
+            let authorized = ( profilesTab.includes('Administrator') || profilesTab.includes('DeliveryMan') || profilesTab.includes('TruckDriver') || profilesTab.includes('Integrator'))
+            if (!authorized){
+                return res.status(401).json({error : 'Utilisateur non autorisé'});
+            }
+
+            //setting time
+            var pad = function(num) { return ('00' + num).slice(-2) };
+            var date;
+            date = new Date();
+            date = date.getUTCFullYear() + '-' +
+            pad(date.getUTCMonth() + 1)  + '-' +
+            pad(date.getUTCDate())       + ' ' +
+            pad(date.getUTCHours())      + ':' +
+            pad(date.getUTCMinutes())    + ':' +
+            pad(date.getUTCSeconds());
+
+            // OK : Return all informations for user
+            request.input('dateNow', sql.DateTime, date);
+            await request.query`UPDATE Users SET LastseenOn = @dateNow WHERE (Id = @userId);`;
+
             res.status(200).json({
                 userData : {
                     Id: userFound.Id,
