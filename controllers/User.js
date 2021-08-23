@@ -7,13 +7,15 @@ exports.login = async (req, res, next) => {
     let api_key = req.query.api_key;
     if (api_key == TOKEN){
         try {
-            // Find user from Table Customers
+
+            // Find user from Table Users
             console.debug('username : ' + req.body.username + ' password : ' + req.body.password )
             const pool = await sql.connect(config)
             const request = pool.request();
             request.input('username', sql.VarChar, req.body.username);
-            const result = await request.query`SELECT TOP 1 U.Id, U.Username, U.Password, C.FullName, S.Name AS StoreName FROM Users U JOIN Contacts C ON C.Id = U.Contact_id JOIN Stores S ON S.Id = U.Store_id WHERE (U.Username = @username AND U.Active = 'TRUE') ;`;
+            const result = await request.query`SELECT TOP 1 U.Id, U.Username, U.Password, U.StoreId, U.ContactId FROM Users U WHERE (U.Username = @username AND U.Active = 'TRUE') ;`;
             userFound = result.recordset[0];
+
             if (!userFound){
                 return res.status(401).json({error : 'Utilisateur Introuvable'});
             }
@@ -23,13 +25,22 @@ exports.login = async (req, res, next) => {
                 return res.status(401).json({error : 'Mot de passe incorrect'});
             }
 
+            //Get User Store
+            if(userFound.StoreId){
+                request.input('storeid', sql.VarChar, userFound.StoreId);
+                const result = await request.query`SELECT TOP 1 S.Name AS StoreName FROM Stores S WHERE (S.Id = @storeid);`; 
+                var userFoundstoreName = result.recordset[0].StoreName;
+            }            
+
             //Get Profiles
             request.input('userId', sql.VarChar, userFound.Id);
-            const result_profiles = await request.query`SELECT R.SystemName FROM UsersRoles UR JOIN Roles R ON R.Id = UR.Role_id WHERE (UR.User_id = @userId);`;
+            const result_profiles = await request.query`SELECT R.SystemName, R.Name AS RoleName FROM UsersRoles UR JOIN Roles R ON R.Id = UR.RoleId WHERE (UR.UserId = @userId);`;
             const profiles = result_profiles.recordset;
-            let profilesTab = []
+            let profilesTab = [];
+            let profilesNamesTab = [];
             for (let i=0; i < profiles.length; i++){
-                profilesTab.push(profiles[i].SystemName) 
+                profilesTab.push(profiles[i].SystemName);
+                profilesNamesTab.push(profiles[i].RoleName)
             }
 
             // Check Profiles
@@ -37,8 +48,15 @@ exports.login = async (req, res, next) => {
             if (!authorized){
                 return res.status(401).json({error : 'Utilisateur non autorisé'});
             }
+            else{
+                if(userFound.ContactId){
+                    request.input('contactid', sql.VarChar, userFound.ContactId);
+                    const result = await request.query`SELECT TOP 1 FullName FROM Contacts WHERE (Id = @contactid);`; 
+                    var userFoundFullName = result.recordset[0].FullName;
+                }
+            }
 
-            //setting time
+            //Setting time
             var pad = function(num) { return ('00' + num).slice(-2) };
             var date;
             date = new Date();
@@ -49,18 +67,38 @@ exports.login = async (req, res, next) => {
             pad(date.getUTCMinutes())    + ':' +
             pad(date.getUTCSeconds());
 
-            // OK : Return all informations for user
             request.input('dateNow', sql.DateTime, date);
+            
+            //Saving Device to User
+            request.input('serialnumber', sql.VarChar, req.body.serialNumber);
+            const result_devices = await request.query`SELECT TOP 1 Id FROM Devices WHERE (SerialNumber = @serialnumber);`;
+            
+            if ( result_devices.recordset.length > 0 ){
+                var deviceFoundId = result_devices.recordset[0].Id;
+                request.input('deviceid', sql.VarChar, deviceFoundId);
+                await request.query`UPDATE Users SET DeviceId = @deviceid WHERE (Id = @userId);`;
+                await request.query`UPDATE Devices SET LastSeenOn = @dateNow WHERE (Id = @deviceid);`;
+            }
+            else {
+                await request.query`INSERT INTO Devices (SerialNumber, CreatedOn, CreatedBy, LastSeenOn) VALUES (@serialnumber, @dateNow, @username, @dateNow);`;
+                const result_devices = await request.query`SELECT TOP 1 Id FROM Devices WHERE (SerialNumber = @serialnumber);`;
+                var deviceFoundId = result_devices.recordset[0].Id;
+                request.input('deviceid', sql.VarChar, deviceFoundId);
+                await request.query`UPDATE Users SET DeviceId = @deviceid WHERE (Id = @userId);`;
+            }
+
+            // OK : Return all informations for user
             await request.query`UPDATE Users SET LastseenOn = @dateNow WHERE (Id = @userId);`;
 
             res.status(200).json({
                 userData : {
-                    Id: userFound.Id,
-                    Username : userFound.Username,
-                    Password : userFound.Password,
-                    FullName : userFound.FullName,
-                    StoreName : userFound.StoreName,
-                    Roles: profilesTab
+                    Id        : userFound.Id,
+                    Username  : userFound.Username,
+                    Password  : userFound.Password,
+                    FullName  : userFoundFullName,
+                    StoreName : userFoundstoreName,
+                    Roles     : profilesNamesTab,
+                    DeviceId  : deviceFoundId
                 },
                 token : jwt.sign(
                     { userId: userFound.Id },
