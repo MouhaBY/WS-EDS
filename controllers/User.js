@@ -2,12 +2,13 @@ const jwt = require('jsonwebtoken');
 var sql = require("mssql");
 const TOKEN = 'MBY';
 var config = require("../sql-config");
+const license = require("../license")
+
 
 exports.login = async (req, res, next) => {
     let api_key = req.query.api_key;
     if (api_key == TOKEN){
         try {
-
             // Find user from Table Users
             console.debug('username : ' + req.body.username + ' password : ' + req.body.password )
             const pool = await sql.connect(config)
@@ -80,11 +81,26 @@ exports.login = async (req, res, next) => {
                 await request.query`UPDATE Devices SET LastSeenOn = @dateNow WHERE (Id = @deviceid);`;
             }
             else {
-                await request.query`INSERT INTO Devices (SerialNumber, CreatedOn, CreatedBy, LastSeenOn) VALUES (@serialnumber, @dateNow, @username, @dateNow);`;
-                const result_devices = await request.query`SELECT TOP 1 Id FROM Devices WHERE (SerialNumber = @serialnumber);`;
-                var deviceFoundId = result_devices.recordset[0].Id;
-                request.input('deviceid', sql.VarChar, deviceFoundId);
-                await request.query`UPDATE Users SET DeviceId = @deviceid WHERE (Id = @userId);`;
+                const licensed_devices = await request.query`SELECT COUNT(Id) AS Number FROM Devices WHERE Actif ='true';`;
+                if (licensed_devices.recordset[0].Number > license.devicesNumber){
+                    return res.status(401).json({error : 'Licence expirée'});
+                }
+                else{
+                    await request.query`INSERT INTO Devices (SerialNumber, CreatedOn, CreatedBy, LastSeenOn) VALUES (@serialnumber, @dateNow, @username, @dateNow);`;
+                    const result_devices = await request.query`SELECT TOP 1 Id FROM Devices WHERE (SerialNumber = @serialnumber);`;
+                    var deviceFoundId = result_devices.recordset[0].Id;
+                    request.input('deviceid', sql.VarChar, deviceFoundId);
+                    await request.query`UPDATE Users SET DeviceId = @deviceid WHERE (Id = @userId);`;
+                }
+            }
+
+            //SET GPS Position
+            if(req.body.location){
+                let latitude = req.body.location.latitude
+                let longitude = req.body.location.longitude
+                request.input('latitude', sql.VarChar, latitude);
+                request.input('longitude', sql.VarChar, longitude);
+                await request.query`UPDATE Devices SET GPSLatitude = @latitude, GPSLongitude=@longitude WHERE (Id = @deviceid);`;
             }
 
             // OK : Return all informations for user
