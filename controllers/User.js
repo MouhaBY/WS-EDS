@@ -29,8 +29,8 @@ exports.login = async (req, res, next) => {
             //Get User Store
             if(userFound.StoreId){
                 request.input('storeid', sql.VarChar, userFound.StoreId);
-                const result = await request.query`SELECT TOP 1 S.Name AS StoreName FROM Stores S WHERE (S.Id = @storeid);`; 
-                var userFoundstoreName = result.recordset[0].StoreName;
+                const result = await request.query`SELECT TOP 1 S.Id, S.Name FROM Stores S WHERE (S.Id = @storeid);`; 
+                var userFoundStore = result.recordset[0];
             }            
 
             //Get Profiles
@@ -112,7 +112,7 @@ exports.login = async (req, res, next) => {
                     Username  : userFound.Username,
                     Password  : userFound.Password,
                     FullName  : userFoundFullName,
-                    StoreName : userFoundstoreName,
+                    Store     : userFoundStore,
                     Roles     : profilesNamesTab,
                     DeviceId  : deviceFoundId
                 },
