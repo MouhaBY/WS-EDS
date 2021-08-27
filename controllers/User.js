@@ -113,6 +113,7 @@ exports.login = async (req, res, next) => {
                     Password  : userFound.Password,
                     FullName  : userFoundFullName,
                     Store     : userFoundStore,
+                    SystemRoles : profilesTab,
                     Roles     : profilesNamesTab,
                     DeviceId  : deviceFoundId
                 },
