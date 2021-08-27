@@ -1,5 +1,5 @@
 // set up SQL connection
-const config = {
+module.exports.config = {
     user: 'sa',
     password: '125',
     server: 'localhost\\SQL14', 
@@ -10,5 +10,3 @@ const config = {
         cryptoCredentialsDetails: { minVersion: 'TLSv1' }
     }
 }
-
-exports.config

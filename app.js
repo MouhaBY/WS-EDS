@@ -6,7 +6,7 @@ var logger = require('morgan');
 var compression = require('compression');
 var helmet = require('helmet');
 var sql = require("mssql");
-//const config = require('./sql-config')
+const {config} = require("./sql-config");
 
 var usersRouter = require('./routes/users');
 var ordersRouter = require('./routes/orders');
@@ -15,18 +15,6 @@ var zonesRouter = require('./routes/zones');
 var app = express();
 app.use(helmet());
 
-//Set up SQL connection
-const config = {
-  user: 'sa',
-  password: '125',
-  server: 'localhost\\SQL14', 
-  database: 'EDSdb', 
-  options: {
-      instanceName: 'SQL14',
-      encrypt: false,
-      cryptoCredentialsDetails: { minVersion: 'TLSv1' }
-  }
-}
 
 pool = sql.connect(config).then(() => console.log('Connexion à SQL réussie !')).catch(() => console.log('Connexion à SQL échouée !'))
 
