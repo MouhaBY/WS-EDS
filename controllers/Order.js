@@ -70,46 +70,35 @@ exports.getOrder = async (req, res, next) => {
     }
 }
 
-exports.getmyOrdersToCollectByZone = async (req, res, next) => {
-    try {
-        console.debug('order zone to collect : ' + req.params.zoneid );
-        const pool = await sql.connect(config);
-        const request = pool.request();
-        request.input('zoneid', sql.VarChar, req.params.zoneid);
-        //ajouter le control sur la date de collecte
-        var result = await request.query`SELECT O.Id, O.OrderNumber, O.CollectAddressFullName, O.CollectAddress, O.CollectAddressPhone, Z.Name AS ZoneName FROM Orders O JOIN Zones Z ON Z.Id = O.HomeCollectZoneId JOIN OrdersStates OS ON OS.OrderId = O.Id WHERE (O.WithHomeCollect = 'True' AND OS.DeliveryStateId = 0 AND O.Actif = 'True' AND O.HomeCollectZoneId = @zoneid );`;      
-        const myOrders = result.recordset;
-        // check if orders found
-        if (!myOrders){
-            return res.status(401).json({error : 'emptyList'});
-        }
-        // Return all informations for parcel
-        res.status(200).json({
-            myOrders
-        })
-    }
-    catch (error) {
-        console.debug(error)
-        res.status(500).json({ error });
-    }
-}
-
-exports.getmyOrdersToCollectByStore = async (req, res, next) => {
+exports.getOrdersToCollectByStore = async (req, res, next) => {
     try {
         console.debug('order zone to collect : ' + req.params.storeid );
         const pool = await sql.connect(config);
         const request = pool.request();
         request.input('storeid', sql.VarChar, req.params.storeid);
-        var result = await request.query`SELECT O.Id, O.OrderNumber, O.CollectAddressFullName, O.CollectAddress, O.CollectAddressPhone, Z.Name AS ZoneName FROM Orders O JOIN Zones Z ON Z.Id = O.HomeCollectZoneId JOIN OrdersStates OS ON OS.OrderId = O.Id JOIN StoresZones SZ ON O.HomeCollectZoneId = SZ.ZoneId WHERE (O.WithHomeCollect = 'True' AND OS.DeliveryStateId = 0 AND O.Actif = 'True' AND SZ.StoreId = @storeid);`;
+        var result = await request.query`SELECT O.Id, O.OrderNumber, O.CollectAddressFullName, O.CollectAddress, O.CollectAddressPhone, Z.Id AS ZoneId, Z.Name AS ZoneName FROM Orders O JOIN Zones Z ON Z.Id = O.HomeCollectZoneId JOIN OrdersStates OS ON OS.OrderId = O.Id JOIN StoresZones SZ ON O.HomeCollectZoneId = SZ.ZoneId WHERE (O.WithHomeCollect = 'True' AND OS.DeliveryStateId = 0 AND O.Actif = 'True' AND SZ.StoreId = @storeid);`;
         //ajouter le control sur la date de collecte
         const myOrders = result.recordset;
         // check if orders found
         if (!myOrders){
             return res.status(401).json({error : 'emptyList'});
         }
+        const myZones = [];
+        const map = new Map();
+        for (const item of myOrders) {
+            if(!map.has(item.ZoneId)){
+                map.set(item.ZoneId, true);
+                myZones.push({
+                    Id: item.ZoneId,
+                    Name: item.ZoneName
+                });
+            }
+        }
+
         // Return all informations for parcel
         res.status(200).json({
-            myOrders
+            myOrders,
+            myZones
         })
     }
     catch (error) {

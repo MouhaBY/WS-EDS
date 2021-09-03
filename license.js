@@ -1,1 +1,1 @@
-module.exports.devicesNumber = 1;
+module.exports.devicesNumber = 2;

@@ -2,7 +2,7 @@ var sql = require("mssql");
 var config = require("../sql-config");
 
 
-exports.getmyZones = async (req, res, next) => {
+exports.getStoreZones = async (req, res, next) => {
     try {
         console.debug('zone for user : ' + req.params.storeid )
         const pool = await sql.connect(config)
